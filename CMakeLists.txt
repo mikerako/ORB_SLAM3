@@ -192,3 +192,17 @@ Examples/Stereo-Inertial/stereo_inertial_tum_vi.cc)
 target_link_libraries(stereo_inertial_tum_vi ${PROJECT_NAME})
 
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/Examples/467)
+
+add_executable(mono_mbot
+Examples/467/mono_mbot.cc)
+target_link_libraries(mono_mbot ${PROJECT_NAME})
+
+
+add_executable(mono_inertial_mbot
+Examples/467/mono_inertial_mbot.cc)
+target_link_libraries(mono_inertial_mbot ${PROJECT_NAME})
+
+
+
+

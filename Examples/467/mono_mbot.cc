@@ -58,11 +58,11 @@ int main(int argc, char **argv)
     int tot_images = 0;
 
     cout << "Loading images" << "...";
+
     // argv[3] holds absolute path to images directory i.e. ~/Datasets/EuRoC/MH01/mav0/cam0/data
     // Example for our 467 structure: ~/Datasets/vSLAM/images
-    // arg[4] holds absolute path to timestamp file i.e ~/Examples/Monocular/EuRoC_TimeStamps/MH01.txt
+    // argv[4] holds absolute path to timestamp file i.e ~/Examples/Monocular/EuRoC_TimeStamps/MH01.txt
     // Example for our 467 structure ~/Datasets/vSLAM/timestamps.txt
-
     LoadImages(string(argv[3]), string(argv[4]), vstrImageFilenames, vTimestampsCam);
     cout << "LOADED!" << endl;
 
@@ -161,6 +161,7 @@ void LoadImages(const string &strImagePath, const string &strPathTimes,
         {
             stringstream ss;
             ss << s;
+            // Image filenames stored by timestamp
             vstrImages.push_back(strImagePath + "/" + ss.str() + ".png");
             double t;
             ss >> t;
