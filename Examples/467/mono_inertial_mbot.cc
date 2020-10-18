@@ -29,9 +29,10 @@
 #include <queue>
 #include <thread>
 #include <mutex>
-#include <lcm/lcm.h>
-#include "lcmtypes/mbot_imu_t.h"
-#include "lcmtypes/mbot_video_stream_t.h"
+#include <lcm/lcm-cpp.hpp>
+#include "lcmtypes/mbot_imu_t.hpp"
+#include "lcmtypes/mbot_video_stream_t.hpp"
+#include <opencv2/opencv.hpp>
 #include <opencv2/core/core.hpp>
 
 #include <System.h>
@@ -49,19 +50,19 @@ void mbot_video_stream_handler(const lcm_recv_buf_t *rbuf, const char *channel,
 void sync_img_imu();
 
 double ttrack_tot = 0;
-lcm_t *lcm;
+
 
 ORB_SLAM3::System* mpSLAM;
-const bool mbClahe;
+bool mbClahe; //set to false to fix compile errors
 cv::Ptr<cv::CLAHE> mClahe = cv::createCLAHE(3.0, cv::Size(8, 8));
 
 queue< vector<float> > imuBuf;
-queue<std::chrono::time_point> imuBufTimes;
+queue<double> imuBufTimes;
 std::mutex imuMtx;
 
-queue<std::chrono::time_point> imgBufTimes;
-queue<CV2::Mat> imgBuf;
-std::mtx imgMtx;
+queue<double> imgBufTimes;
+queue<cv::Mat> imgBuf;
+std::mutex imgMtx;
 
 
 /*
@@ -75,18 +76,61 @@ struct mbot_imu_t
     float tb_angles[3];
     float temp;
 }
-*/    
+*/
+
+class Handler
+{
+public:
+    ~Handler() {}
+
+    void mbot_video_stream_handler(const lcm::ReceiveBuffer* rbuf, const std::string& chan, const mbot_video_stream_t* msg)
+    {
+        imgMtx.lock();
+        // Use nanoseconds since epoch for consistency
+        auto tImg = std::chrono::steady_clock::now();
+        imgBufTimes.push(std::chrono::duration_cast<std::chrono::nanoseconds>(tImg.time_since_epoch()).count()/1e9); 
+
+        int16_t rows = msg->height;
+        int16_t cols = msg->width;
+        // TODO: Change to CV_8UC1
+        cv::Mat img_recv(rows, cols, CV_8UC1);
+        // Need to copy so data is owned by CV::Mat object
+        memcpy(img_recv.data, msg->image, rows*cols*sizeof(uint8_t));
+        imgBuf.push(img_recv);
+        imgMtx.unlock();
+    }
+
+    void mbot_imu_handler(const lcm::ReceiveBuffer* rbuf, const std::string& chan, const mbot_imu_t* msg)
+    {
+        // int64_t utime; float gyro[3]; float accel[3]; float mag[3]; float tb_angles[3]; float temp;
+        imuMtx.lock();
+        // Use nanoseconds since epoch for consistency ; not using msg->utime
+        auto tImu = std::chrono::steady_clock::now();
+        imuBufTimes.push(std::chrono::duration_cast<std::chrono::nanoseconds>(tImu.time_since_epoch()).count()/1e9); 
+        
+        vector<float> imu;
+        imu.resize(13);
+        for(short i = 0; i < 3; ++i){
+            imu[0 + i] = (msg->gyro[i]);
+            imu[3 + i] = (msg->accel[i]);
+            imu[6 + i] = (msg->mag[i]);
+            imu[9 + i] = (msg->tb_angles[i]);
+        }
+        imu[12] = msg->temp;
+        imuBuf.push(imu);
+
+        imuMtx.unlock();
+    }
+
+};
     
-
-
 
 int main(int argc, char *argv[])
 {
 
     if(argc < 3)
     {
-        cerr << endl << "Usage: ./mono_inertial_euroc path_to_vocabulary 
-            path_to_settings" << endl;
+        cerr << endl << "Usage: ./mono_inertial_euroc path_to_vocabulary path_to_settings" << endl;
         return 1;
     }
     if(argc >= 4){
@@ -100,16 +144,15 @@ int main(int argc, char *argv[])
         mbClahe = false;
     }
 
-    lcm = lcm_create("udpm://239.255.76.67:7667?ttl=1");
-    mbot_imu_t_subscribe(lcm, 
-    					MBOT_IMU_CHANNEL, 
-    					mbot_imu_handler, 
-    					NULL);
+    lcm::LCM lcm = lcm_create("udpm://239.255.76.67:7667?ttl=1");
+    Handler HandlerObject;
+    lcm.subscribe(MBOT_IMU_CHANNEL, 
+    			  &Handler::mbot_imu_handler, 
+    			  &HandlerObject);
 
-    mbot_video_stream_t_subscribe(lcm, 
-    					    MBOT_VIDEO_CHANNEL, 
-    					    mbot_video_stream_handler, 
-    						NULL);
+    lcm.subscribe(MBOT_VIDEO_CHANNEL, 
+    			&Handler::mbot_video_stream_handler, 
+    			&HandlerObject);   
     
 
     // Vector for tracking time statistics
@@ -126,15 +169,14 @@ int main(int argc, char *argv[])
 
     // Main loop
     //cv::Mat im;
-    std::thread sync_thread(&SyncWithImu);
+    std::thread sync_thread(&sync_img_imu);
     while(1)
     {
         
-        char key = (char) cv::waitkey(1);
+        char key = (char) cv::waitKey(1);
         if(key == 113 || key == 27) break; // 113 is 'q' key, 27 is 'ESC' key
     }
 
-    lcm_destroy(lcm);
     // Stop all threads
     SLAM.Shutdown();
 
@@ -148,16 +190,16 @@ int main(int argc, char *argv[])
 void sync_img_imu(){
     while(1)
     {
-        CV::Mat img;
+        cv::Mat img;
         double tImg;
         // Wait until we have image and imu data to process
         if(!imgBuf.empty() && !imuBuf.empty()){
-            auto tImg = imgBufTimes.top();
+            tImg = imgBufTimes.front();
             if(tImg > imuBufTimes.back())
                 continue;
             
             imgMtx.lock();
-            img = imgBuf.top();
+            img = imgBuf.front();
             imgBuf.pop();
             imgBufTimes.pop();
             imgMtx.unlock();            
@@ -179,7 +221,7 @@ void sync_img_imu(){
                                                                 vTimestampsImu[seq][first_imu[seq]]));*/
                     vImuMeas.push_back(ORB_SLAM3::IMU::Point(imuBuf.front()[3], imuBuf.front()[4], imuBuf.front()[5],
                                                             imuBuf.front()[0], imuBuf.front()[1], imuBuf.front()[2],
-                                                            imuBufTimes.front());
+                                                            imuBufTimes.front()));
                     imuBufTimes.pop();
                     imuBuf.pop();
                 }
@@ -189,15 +231,14 @@ void sync_img_imu(){
             {
                 mClahe->apply(img,img);
             }
-            // Convert timepoint to double in seconds for SLAM, get nanosecond precision:
-            double timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(tImg.time_since_epoch()).count()/1e9;
+            
             
 #ifdef COMPILEDWITHC11
             std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
 #else
             std::chrono::monotonic_clock::time_point t1 = std::chrono::monotonic_clock::now();
 #endif
-            mpSLAM->TrackMonocular(img,timestamp,vImuMeas);
+            mpSLAM->TrackMonocular(img,tImg,vImuMeas);
 
 #ifdef COMPILEDWITHC11
             std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
@@ -213,44 +254,4 @@ void sync_img_imu(){
         std::chrono::milliseconds tSleep(1);
         std::this_thread::sleep_for(tSleep);
     }
-}
-
-void mbot_imu_handler(const lcm_recv_buf_t *rbuf, const char *channel,
-    const mbot_imu_t *msg, void *user)
-{
-    //int64_t utime; float gyro[3]; float accel[3]; float mag[3]; float tb_angles[3]; float temp;
-    imuMtx.lock();
-    // Use nanoseconds since epoch for consistency
-    imuBufTimes.push(std::chrono::steady_clock::now()); //not using msg->utime
-    
-    vector<float> imu;
-    imu.resize(13);
-    for(short i = 0; i < 3; ++i){
-        imu[0 + i] = (msg->gyro[i]);
-        imu[3 + i] = (msg->accel[i])
-        imu[6 + i] = (msg->mag[i])
-        imu[9 + i] = (msg->tb_angles[i])
-    }
-    imu[12] = temp;
-    imuBuf.push(imu);
-
-    imuMtx.unlock();
-}
-
-
-void mbot_video_stream_handler(const lcm_recv_buf_t *rbuf, const char *channel, 
-    const mbot_video_stream_t *msg, void *user)
-{
-    imgMtx.lock();
-    // Use nanoseconds since epoch for consistency
-    imgBufTimes.push(std::chrono::steady_clock::now()); 
-
-    int16_t rows = msg->height;
-    int16_t cols = msg->width;
-    // TODO: Change to CV_8UC1
-    CV::Mat img_recv(rows, cols, CV_8UC1);
-    // Need to copy so data is owned by CV::Mat object
-    memcpy(img_recv.data, msg->image, rows*cols*sizeof(uint8_t));
-    imgBuf.push(img_recv);
-    imgMtx.unlock();
 }
