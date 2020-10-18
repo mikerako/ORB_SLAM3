@@ -2,6 +2,7 @@ struct mbot_video_stream_t
 {
     int16_t width;
     int16_t height;
+    int64_t enc_length;
     int64_t timestamp;
-    int64_t image[307200];
+    byte image[enc_length];
 }
