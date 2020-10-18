@@ -46,6 +46,7 @@ MESSAGE(${OpenCV_VERSION})
 
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Pangolin REQUIRED)
+find_package(lcm)
 
 include_directories(
 ${PROJECT_SOURCE_DIR}
@@ -122,6 +123,7 @@ ${EIGEN3_LIBS}
 ${Pangolin_LIBRARIES}
 ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
 ${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/libg2o.so
+${LCM_NAMESPACE}lcm
 -lboost_serialization
 -lcrypto
 )
