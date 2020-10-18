@@ -5,21 +5,22 @@
 #--------------------------------------------------------------------------------------------
 Camera.type: "KannalaBrandt8"
 # Camera calibration and distortion parameters (OpenCV) 
-Camera.fx: 190.978477 # 190.97847715128717
-Camera.fy: 190.973307 # 190.9733070521226
-Camera.cx: 254.931706 # 254.93170605935475
-Camera.cy: 256.897442 # 256.8974428996504
+Camera.fx: 183.86961413575094 # 190.97847715128717
+Camera.fy: 184.138089090955 # 190.9733070521226
+Camera.cx: 323.1596375160521 # 254.93170605935475
+Camera.cy: 243.72750306994618 # 256.8974428996504
 
+#{"intrinsics": [[183.86961413575094, 0.0, 323.1596375160521], [0.0, 184.138089090955, 243.72750306994618], [0.0, 0.0, 1.0]], "distortion": [[0.06871296801898627], [-0.03948007487493641], [0.007396054138482068], [-0.00035078302432331085]]}
 # Equidistant distortion 0.0034823894022493434, 0.0007150348452162257, -0.0020532361418706202, 0.00020293673591811182
 #Camera.bFishEye: 1
-Camera.k1: 0.003482389402 # 0.0034823894022493434
-Camera.k2: 0.000715034845 # 0.0007150348452162257
-Camera.k3: -0.002053236141 # -0.0020532361418706202
-Camera.k4: 0.000202936736 # 0.00020293673591811182
+Camera.k1: 0.06871296801898627 # 0.0034823894022493434
+Camera.k2: 0.03948007487493641 # 0.0007150348452162257
+Camera.k3: -0.007396054138482068 # -0.0020532361418706202
+Camera.k4: 0.00035078302432331085 # 0.00020293673591811182
     
 # Camera resolution
-Camera.width: 512
-Camera.height: 512
+Camera.width: 640
+Camera.height: 480
 
 # Camera frames per second 
 Camera.fps: 20.0
@@ -71,8 +72,8 @@ ORBextractor.nLevels: 8
 # Image is divided in a grid. At each cell FAST are extracted imposing a minimum response.
 # Firstly we impose iniThFAST. If no corners are detected we impose a lower value minThFAST
 # You can lower these values if your images have low contrast			
-ORBextractor.iniThFAST: 20
-ORBextractor.minThFAST: 7
+ORBextractor.iniThFAST: 16
+ORBextractor.minThFAST: 8
 
 #--------------------------------------------------------------------------------------------
 # Viewer Parameters
