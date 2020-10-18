@@ -90,7 +90,7 @@ public:
         auto tImg = std::chrono::steady_clock::now();
         imgBufTimes.push(std::chrono::duration_cast<std::chrono::nanoseconds>(tImg.time_since_epoch()).count()/1e9); 
 
-        cv::Mat img_recv = imdecode(msg->image, IMREAD_GRAYSCALE);
+        cv::Mat img_recv = cv::imdecode(msg->image, cv::ImreadModes::IMREAD_GRAYSCALE);
         imgBuf.push(img_recv);
         imgMtx.unlock();
     }
