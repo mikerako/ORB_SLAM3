@@ -90,12 +90,7 @@ public:
         auto tImg = std::chrono::steady_clock::now();
         imgBufTimes.push(std::chrono::duration_cast<std::chrono::nanoseconds>(tImg.time_since_epoch()).count()/1e9); 
 
-        int16_t rows = msg->height;
-        int16_t cols = msg->width;
-        // TODO: Change to CV_8UC1
-        cv::Mat img_recv(rows, cols, CV_8UC1);
-        // Need to copy so data is owned by CV::Mat object
-        memcpy(img_recv.data, msg->image, rows*cols*sizeof(uint8_t));
+        cv::Mat img_recv = imdecode(msg->image, IMREAD_GRAYSCALE);
         imgBuf.push(img_recv);
         imgMtx.unlock();
     }
